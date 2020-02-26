@@ -1,41 +1,42 @@
+import requests,time
+
 # Determine the location we want to race at.
     # Wild Horse Pass Motorsports Park - Chandler, AZ
-altitude = 0 #dummy value
+trackAltitude = 1145 #dummy value
 
 # Get the local weather data.
     # API Call to Weather Site
-    #https://api.darksky.net/forecast/85b406747dd735450a89f10a52b8f4fa/33.270568,-111.9710482
+response = requests.get('https://api.darksky.net/forecast/85b406747dd735450a89f10a52b8f4fa/33.270568,-111.9710482')
+
+if not response.ok:
+    print(response.json())
+
+response = response.json()
 
 # Add that data to variables.
+airTemp = response['currently']['temperature']
+stationPressure = response['currently']['pressure']
+dewpointTemp = response['currently']['dewPoint'] # not currently used
 
-# Calculate the DA.
-# Values needed to start calculations - will eventually come from API, currently test data
-airTemp = 62.2
-stationPressure = 1016.9
-dewpointTemp = 45.78
+print(airTemp)
+print(stationPressure)
+print(dewpointTemp)
 
-#convert to Kelvin
-airTemp = (airTemp - 32) * 5/9 + 273.15
-print('temp in kelvin %s' %airTemp)
+# Convert millibar pressure to inHg
+stationPressure = stationPressure/33.864
+print (stationPressure)
 
-#convert to Celsius
-dewpointTemp = (dewpointTemp - 32) * 5/9
-print('dp in celc %s' %dewpointTemp)
+# Convert F to C
+airTemp = (airTemp - 32) * 5/9
+print(airTemp)
 
-vaporPressure = 6.11 * (10 * ((7.5 * dewpointTemp)/(237.7 + dewpointTemp)))
-print('vapor pressure %s' %vaporPressure)
-virtualTemp = airTemp/(1-(vaporPressure/stationPressure)*(1-0.622))
-print('virtual temp %s' %virtualTemp)
+# Simple DA formula
+pressureAltitude = ((29.92 - stationPressure) * 1000) + trackAltitude
+print(pressureAltitude)
 
-#convert to Rankine
-virtualTemp = virtualTemp * 1.8
-
-#convert to inHG
-stationPressure = stationPressure / 33.864
-
-# finally
-densityAltitude = 145366 * (1-((17.326 * stationPressure)/virtualTemp)**0.235)
-
+densityAltitude = (airTemp - (15 + -2 * 1)) * 120 + pressureAltitude
 print(densityAltitude)
 
 # Send an SMS with that information.
+
+# Include current estimated horsepower gain
