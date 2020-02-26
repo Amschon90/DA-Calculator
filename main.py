@@ -1,42 +1,52 @@
-import requests,time
+import requests,sys,time,os,smtplib
 
-# Determine the location we want to race at.
-    # Wild Horse Pass Motorsports Park - Chandler, AZ
-trackAltitude = 1145 #dummy value
+# Secrets
+gmailUser = os.environ.get('GMAIL_USER')
+gmailPass = os.environ.get('GMAIL_PASS')
+apiSecret = os.environ.get('DS_SECRET_KEY')
+smsSecret = os.environ.get('SMS_SECRET')
 
-# Get the local weather data.
-    # API Call to Weather Site
-response = requests.get('https://api.darksky.net/forecast/85b406747dd735450a89f10a52b8f4fa/33.270568,-111.9710482')
+# Hardcoded values, will be removed eventually
+trackCoordinates = '33.270568,-111.9710482'
+trackAltitude = 1145
 
-if not response.ok:
-    print(response.json())
+def getWeather():
+    response = requests.get('https://api.darksky.net/forecast/%s/%s' %(apiSecret,trackCoordinates))
+    # Checks if API call was successful
+    if not response.ok:
+        print('There was an error connecting to Dark Sky.')
+        print(response.json())
+        sys.exit()
+    response = response.json()
+    weather = dict()
+    # Insert values from API call into dictionary
+    weather['airTemp'] = response['currently']['temperature']
+    weather['stationPressure'] = response['currently']['pressure']
+    weather['dewpointTemp'] = response['currently']['dewPoint']
+    return weather
 
-response = response.json()
+def calculateDA(w):
+    # Convert millibar pressure to inHg
+    stationPressureinHG = w.get('stationPressure')/33.864
+    # Convert F to C
+    airTempC = (w.get('airTemp') - 32) * 5/9
+    # Simple PA and DA formula
+    pressureAltitude = ((29.92 - stationPressureinHG) * 1000) + trackAltitude
+    densityAltitude = int((airTempC - (15 + -2 * 1)) * 120 + pressureAltitude)
+    return densityAltitude
 
-# Add that data to variables.
-airTemp = response['currently']['temperature']
-stationPressure = response['currently']['pressure']
-dewpointTemp = response['currently']['dewPoint'] # not currently used
+def sendSMS(msg):
+    # Connect to Gmail, send an SMS
+    server = smtplib.SMTP( 'smtp.gmail.com',587)
+    server.starttls()
+    server.login(gmailUser,gmailPass)
+    print(gmailUser,smsSecret,myMessage) # This line prints what goes into the SMS
+    # Keep below line commented out to prevent text from being sent
+    #server.sendmail(gmailUser,smsSecret,myMessage)
 
-print(airTemp)
-print(stationPressure)
-print(dewpointTemp)
+# Makes call to API to get the weather at the track
+trackWeather = getWeather()
 
-# Convert millibar pressure to inHg
-stationPressure = stationPressure/33.864
-print (stationPressure)
-
-# Convert F to C
-airTemp = (airTemp - 32) * 5/9
-print(airTemp)
-
-# Simple DA formula
-pressureAltitude = ((29.92 - stationPressure) * 1000) + trackAltitude
-print(pressureAltitude)
-
-densityAltitude = (airTemp - (15 + -2 * 1)) * 120 + pressureAltitude
-print(densityAltitude)
-
-# Send an SMS with that information.
-
-# Include current estimated horsepower gain
+# Calulate DA, compose message, and then send it
+myMessage = 'Current DA for WHP is %s' %(calculateDA(trackWeather))
+sendSMS(myMessage)
